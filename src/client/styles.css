@@ -87,3 +87,66 @@ h1 {
 .status--error {
   color: #ff9db8;
 }
+
+.join-form,
+.joined-card {
+  width: min(100%, 26rem);
+}
+
+.join-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.join-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: #d9d9e8;
+  font-weight: 700;
+}
+
+.join-form input {
+  width: 100%;
+  border: 2px solid rgb(255 255 255 / 18%);
+  border-radius: 0.75rem;
+  outline: none;
+  padding: 0.85rem 1rem;
+  color: #10142b;
+  background: #fff;
+  font-size: 1.15rem;
+}
+
+.join-form input:focus {
+  border-color: #a893ff;
+  box-shadow: 0 0 0 4px rgb(168 147 255 / 25%);
+}
+
+.join-form button {
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #17132b;
+  background: #b9adff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.join-form button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.form-error {
+  margin: 0;
+  color: #ff9db8;
+  font-weight: 700;
+}
+
+.joined-card {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+}

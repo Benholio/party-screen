@@ -7,9 +7,18 @@ const MAX_CODE_ATTEMPTS = 100;
 export interface Room {
   code: string;
   hostSocketId: string;
+  players: Map<string, Player>;
+}
+
+export interface Player {
+  id: string;
+  name: string;
 }
 
 type CodeGenerator = () => string;
+type JoinResult =
+  | { ok: true; room: Room; player: Player }
+  | { ok: false; reason: "invalid-code" | "invalid-name" | "duplicate-name" | "already-joined" };
 
 function generateRoomCode(): string {
   return Array.from(
@@ -34,7 +43,7 @@ export class RoomStore {
       const code = this.codeGenerator();
 
       if (!this.rooms.has(code)) {
-        const room = { code, hostSocketId };
+        const room = { code, hostSocketId, players: new Map<string, Player>() };
         this.rooms.set(code, room);
         return room;
       }
@@ -44,7 +53,38 @@ export class RoomStore {
   }
 
   get(code: string): Room | undefined {
-    return this.rooms.get(code);
+    return this.rooms.get(code.trim().toUpperCase());
+  }
+
+  join(code: string, socketId: string, name: string): JoinResult {
+    if (this.findPlayerRoom(socketId)) {
+      return { ok: false, reason: "already-joined" };
+    }
+
+    const room = this.get(code);
+
+    if (!room) {
+      return { ok: false, reason: "invalid-code" };
+    }
+
+    const normalizedName = name.replace(/\s+/g, " ").trim();
+
+    if (normalizedName.length === 0 || normalizedName.length > 20) {
+      return { ok: false, reason: "invalid-name" };
+    }
+
+    const normalizedNameKey = normalizedName.toLocaleLowerCase();
+    const nameTaken = Array.from(room.players.values()).some(
+      (player) => player.name.toLocaleLowerCase() === normalizedNameKey,
+    );
+
+    if (nameTaken) {
+      return { ok: false, reason: "duplicate-name" };
+    }
+
+    const player = { id: socketId, name: normalizedName };
+    room.players.set(socketId, player);
+    return { ok: true, room, player };
   }
 
   deleteByHost(hostSocketId: string): boolean {
@@ -52,7 +92,16 @@ export class RoomStore {
     return room ? this.rooms.delete(room.code) : false;
   }
 
+  removePlayer(socketId: string): boolean {
+    const room = this.findPlayerRoom(socketId);
+    return room ? room.players.delete(socketId) : false;
+  }
+
   private findByHost(hostSocketId: string): Room | undefined {
     return Array.from(this.rooms.values()).find((room) => room.hostSocketId === hostSocketId);
+  }
+
+  private findPlayerRoom(socketId: string): Room | undefined {
+    return Array.from(this.rooms.values()).find((room) => room.players.has(socketId));
   }
 }
