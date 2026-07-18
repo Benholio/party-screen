@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
 import type {
+  CanvasSnapshot,
+  CanvasStroke,
+  CanvasStrokeResult,
   ClientToServerEvents,
   CreateRoomResult,
   JoinRoomResult,
@@ -24,7 +27,7 @@ describe("lobby socket flow", () => {
   beforeEach(async () => {
     httpServer = createServer();
     ioServer = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
-    registerSocketHandlers(ioServer, new RoomStore(() => "ABCD"));
+    registerSocketHandlers(ioServer, new RoomStore());
 
     await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
     const address = httpServer.address() as AddressInfo;
@@ -48,43 +51,87 @@ describe("lobby socket flow", () => {
     return new Promise((resolve) => client.emit("room:create", resolve));
   }
 
-  function joinRoom(client: PartyClient, code: string, name: string): Promise<JoinRoomResult> {
-    return new Promise((resolve) => client.emit("room:join", { code, name }, resolve));
+  function joinRoom(client: PartyClient): Promise<JoinRoomResult> {
+    return new Promise((resolve) => client.emit("room:join", resolve));
   }
 
   function nextLobby(client: PartyClient): Promise<LobbySnapshot> {
     return new Promise((resolve) => client.once("lobby:updated", resolve));
   }
 
+  function nextCanvasSnapshot(client: PartyClient): Promise<CanvasSnapshot> {
+    return new Promise((resolve) => client.once("canvas:snapshot", resolve));
+  }
+
+  function nextStroke(client: PartyClient): Promise<CanvasStroke> {
+    return new Promise((resolve) => client.once("canvas:stroke", resolve));
+  }
+
+  function sendStroke(client: PartyClient, stroke: CanvasStroke): Promise<CanvasStrokeResult> {
+    return new Promise((resolve) => client.emit("canvas:stroke", stroke, resolve));
+  }
+
   it("synchronizes joins, player disconnects, and host closure", async () => {
     const host = await connectClient();
     const created = await createRoom(host);
-    expect(created).toEqual({ ok: true, code: "ABCD" });
+    expect(created).toEqual({ ok: true });
 
     const player = await connectClient();
     const hostJoinedLobby = nextLobby(host);
     const playerJoinedLobby = nextLobby(player);
-    expect(await joinRoom(player, "ABCD", "Ada")).toEqual({
+    expect(await joinRoom(player)).toEqual({
       ok: true,
-      code: "ABCD",
-      name: "Ada",
+      name: "Player 1",
     });
 
     const expectedLobby = {
-      code: "ABCD",
-      players: [{ id: player.id, name: "Ada" }],
+      players: [{ id: player.id, name: "Player 1" }],
     };
     expect(await hostJoinedLobby).toEqual(expectedLobby);
     expect(await playerJoinedLobby).toEqual(expectedLobby);
 
     const playerLeftLobby = nextLobby(host);
     player.disconnect();
-    expect(await playerLeftLobby).toEqual({ code: "ABCD", players: [] });
+    expect(await playerLeftLobby).toEqual({ players: [] });
 
     const secondPlayer = await connectClient();
-    await joinRoom(secondPlayer, "ABCD", "Grace");
+    await joinRoom(secondPlayer);
     const roomClosed = new Promise<void>((resolve) => secondPlayer.once("room:closed", resolve));
     host.disconnect();
     await roomClosed;
+  });
+
+  it("allows a waiting phone to join after the display session appears", async () => {
+    const player = await connectClient();
+    expect(await joinRoom(player)).toEqual({
+      ok: false,
+      message: "Waiting for an active shared display…",
+    });
+
+    const host = await connectClient();
+    await createRoom(host);
+    expect(await joinRoom(player)).toEqual({ ok: true, name: "Player 1" });
+  });
+
+  it("shares strokes and gives late joiners the current canvas", async () => {
+    const host = await connectClient();
+    await createRoom(host);
+    const player = await connectClient();
+    const initialCanvas = nextCanvasSnapshot(player);
+    await joinRoom(player);
+    expect(await initialCanvas).toEqual({ strokes: [] });
+
+    const stroke = {
+      id: "stroke-1",
+      points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+    };
+    const hostStroke = nextStroke(host);
+    expect(await sendStroke(player, stroke)).toEqual({ ok: true });
+    expect(await hostStroke).toEqual(stroke);
+
+    const latePlayer = await connectClient();
+    const currentCanvas = nextCanvasSnapshot(latePlayer);
+    await joinRoom(latePlayer);
+    expect(await currentCanvas).toEqual({ strokes: [stroke] });
   });
 });

@@ -1,14 +1,7 @@
-export type CreateRoomResult =
-  | { ok: true; code: string }
-  | { ok: false; message: string };
-
-export interface JoinRoomRequest {
-  code: string;
-  name: string;
-}
+export type CreateRoomResult = { ok: true } | { ok: false; message: string };
 
 export type JoinRoomResult =
-  | { ok: true; code: string; name: string }
+  | { ok: true; name: string }
   | { ok: false; message: string };
 
 export interface LobbyPlayer {
@@ -17,19 +10,37 @@ export interface LobbyPlayer {
 }
 
 export interface LobbySnapshot {
-  code: string;
   players: LobbyPlayer[];
 }
 
+export interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+export interface CanvasStroke {
+  id: string;
+  points: CanvasPoint[];
+}
+
+export interface CanvasSnapshot {
+  strokes: CanvasStroke[];
+}
+
+export type CanvasStrokeResult = { ok: true } | { ok: false; message: string };
+
 export interface ClientToServerEvents {
   "room:create": (acknowledge: (result: CreateRoomResult) => void) => void;
-  "room:join": (
-    request: JoinRoomRequest,
-    acknowledge: (result: JoinRoomResult) => void,
+  "room:join": (acknowledge: (result: JoinRoomResult) => void) => void;
+  "canvas:stroke": (
+    stroke: CanvasStroke,
+    acknowledge: (result: CanvasStrokeResult) => void,
   ) => void;
 }
 
 export interface ServerToClientEvents {
   "lobby:updated": (lobby: LobbySnapshot) => void;
   "room:closed": () => void;
+  "canvas:snapshot": (canvas: CanvasSnapshot) => void;
+  "canvas:stroke": (stroke: CanvasStroke) => void;
 }

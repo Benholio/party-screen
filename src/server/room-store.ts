@@ -1,13 +1,9 @@
-import { randomInt } from "node:crypto";
-
-const ROOM_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-const ROOM_CODE_LENGTH = 4;
-const MAX_CODE_ATTEMPTS = 100;
+import type { CanvasStroke } from "../shared/protocol.js";
 
 export interface Room {
-  code: string;
   hostSocketId: string;
   players: Map<string, Player>;
+  strokes: CanvasStroke[];
 }
 
 export interface Player {
@@ -15,84 +11,67 @@ export interface Player {
   name: string;
 }
 
-type CodeGenerator = () => string;
 type JoinResult =
   | { ok: true; room: Room; player: Player }
-  | { ok: false; reason: "invalid-code" | "invalid-name" | "duplicate-name" | "already-joined" };
-
-function generateRoomCode(): string {
-  return Array.from(
-    { length: ROOM_CODE_LENGTH },
-    () => ROOM_CODE_ALPHABET[randomInt(ROOM_CODE_ALPHABET.length)],
-  ).join("");
-}
+  | { ok: false; reason: "no-active-room" };
 
 export class RoomStore {
-  private readonly rooms = new Map<string, Room>();
-
-  constructor(private readonly codeGenerator: CodeGenerator = generateRoomCode) {}
+  private activeRoom?: Room;
 
   create(hostSocketId: string): Room {
-    const existingRoom = this.findByHost(hostSocketId);
+    if (this.activeRoom) return this.activeRoom;
+    this.activeRoom = {
+      hostSocketId,
+      players: new Map<string, Player>(),
+      strokes: [],
+    };
+    return this.activeRoom;
+  }
 
+  getActive(): Room | undefined {
+    return this.activeRoom;
+  }
+
+  joinActive(socketId: string): JoinResult {
+    const existingRoom = this.findPlayerRoom(socketId);
     if (existingRoom) {
-      return existingRoom;
+      return { ok: true, room: existingRoom, player: existingRoom.players.get(socketId)! };
     }
 
-    for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
-      const code = this.codeGenerator();
-
-      if (!this.rooms.has(code)) {
-        const room = { code, hostSocketId, players: new Map<string, Player>() };
-        this.rooms.set(code, room);
-        return room;
-      }
-    }
-
-    throw new Error("Could not generate a unique room code");
-  }
-
-  get(code: string): Room | undefined {
-    return this.rooms.get(code.trim().toUpperCase());
-  }
-
-  join(code: string, socketId: string, name: string): JoinResult {
-    if (this.findPlayerRoom(socketId)) {
-      return { ok: false, reason: "already-joined" };
-    }
-
-    const room = this.get(code);
-
+    const room = this.activeRoom;
     if (!room) {
-      return { ok: false, reason: "invalid-code" };
+      return { ok: false, reason: "no-active-room" };
     }
 
-    const normalizedName = name.replace(/\s+/g, " ").trim();
-
-    if (normalizedName.length === 0 || normalizedName.length > 20) {
-      return { ok: false, reason: "invalid-name" };
+    let playerNumber = 1;
+    const names = new Set(Array.from(room.players.values(), ({ name }) => name));
+    while (names.has(`Player ${playerNumber}`)) {
+      playerNumber += 1;
     }
 
-    const normalizedNameKey = normalizedName.toLocaleLowerCase();
-    const nameTaken = Array.from(room.players.values()).some(
-      (player) => player.name.toLocaleLowerCase() === normalizedNameKey,
-    );
-
-    if (nameTaken) {
-      return { ok: false, reason: "duplicate-name" };
-    }
-
-    const player = { id: socketId, name: normalizedName };
+    const player = { id: socketId, name: `Player ${playerNumber}` };
     room.players.set(socketId, player);
     return { ok: true, room, player };
   }
 
-  deleteByHost(hostSocketId: string): Room | undefined {
-    const room = this.findByHost(hostSocketId);
-
-    if (room) {
-      this.rooms.delete(room.code);
+  addStroke(socketId: string, stroke: CanvasStroke): Room | undefined {
+    const room = this.findPlayerRoom(socketId);
+    if (!room || room.strokes.length >= 5_000 || room.strokes.some(({ id }) => id === stroke.id)) {
+      return undefined;
     }
+
+    const valid = stroke.id.length <= 100 && stroke.points.length >= 2 && stroke.points.length <= 500
+      && stroke.points.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)
+        && x >= 0 && x <= 1 && y >= 0 && y <= 1);
+    if (!valid) return undefined;
+
+    room.strokes.push(stroke);
+    return room;
+  }
+
+  deleteByHost(hostSocketId: string): Room | undefined {
+    const room = this.activeRoom?.hostSocketId === hostSocketId ? this.activeRoom : undefined;
+    if (room) this.activeRoom = undefined;
 
     return room;
   }
@@ -107,11 +86,7 @@ export class RoomStore {
     return room;
   }
 
-  private findByHost(hostSocketId: string): Room | undefined {
-    return Array.from(this.rooms.values()).find((room) => room.hostSocketId === hostSocketId);
-  }
-
   private findPlayerRoom(socketId: string): Room | undefined {
-    return Array.from(this.rooms.values()).find((room) => room.players.has(socketId));
+    return this.activeRoom?.players.has(socketId) ? this.activeRoom : undefined;
   }
 }

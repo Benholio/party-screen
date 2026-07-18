@@ -1,18 +1,23 @@
 import type { Server } from "socket.io";
 import type {
   ClientToServerEvents,
+  CanvasSnapshot,
   LobbySnapshot,
   ServerToClientEvents,
 } from "../shared/protocol.js";
 import type { Room, RoomStore } from "./room-store.js";
 
 type PartyServer = Server<ClientToServerEvents, ServerToClientEvents>;
+const SESSION_CHANNEL = "active-session";
 
 function lobbySnapshot(room: Room): LobbySnapshot {
   return {
-    code: room.code,
     players: Array.from(room.players.values()),
   };
+}
+
+function canvasSnapshot(room: Room): CanvasSnapshot {
+  return { strokes: room.strokes };
 }
 
 export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void {
@@ -20,45 +25,51 @@ export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void 
     socket.on("room:create", (acknowledge) => {
       try {
         const room = rooms.create(socket.id);
-        void socket.join(room.code);
-        acknowledge({ ok: true, code: room.code });
-        io.to(room.code).emit("lobby:updated", lobbySnapshot(room));
+        void socket.join(SESSION_CHANNEL);
+        acknowledge({ ok: true });
+        io.to(SESSION_CHANNEL).emit("lobby:updated", lobbySnapshot(room));
+        socket.emit("canvas:snapshot", canvasSnapshot(room));
       } catch {
         acknowledge({ ok: false, message: "Unable to create a room. Please try again." });
       }
     });
 
-    socket.on("room:join", (request, acknowledge) => {
-      const result = rooms.join(request.code, socket.id, request.name);
+    socket.on("room:join", (acknowledge) => {
+      const result = rooms.joinActive(socket.id);
 
       if (!result.ok) {
-        const messages = {
-          "invalid-code": "We couldn't find that room.",
-          "invalid-name": "Enter a name between 1 and 20 characters.",
-          "duplicate-name": "That name is already in use in this room.",
-          "already-joined": "This phone has already joined a room.",
-        };
-        acknowledge({ ok: false, message: messages[result.reason] });
+        acknowledge({ ok: false, message: "Waiting for an active shared display…" });
         return;
       }
 
-      void socket.join(result.room.code);
-      acknowledge({ ok: true, code: result.room.code, name: result.player.name });
-      io.to(result.room.code).emit("lobby:updated", lobbySnapshot(result.room));
+      void socket.join(SESSION_CHANNEL);
+      acknowledge({ ok: true, name: result.player.name });
+      io.to(SESSION_CHANNEL).emit("lobby:updated", lobbySnapshot(result.room));
+      socket.emit("canvas:snapshot", canvasSnapshot(result.room));
+    });
+
+    socket.on("canvas:stroke", (stroke, acknowledge) => {
+      const room = rooms.addStroke(socket.id, stroke);
+      if (room) {
+        acknowledge({ ok: true });
+        socket.to(SESSION_CHANNEL).emit("canvas:stroke", stroke);
+      } else {
+        acknowledge({ ok: false, message: "That stroke could not be shared. Please try again." });
+      }
     });
 
     socket.on("disconnect", () => {
       const hostedRoom = rooms.deleteByHost(socket.id);
 
       if (hostedRoom) {
-        io.to(hostedRoom.code).emit("room:closed");
+        io.to(SESSION_CHANNEL).emit("room:closed");
         return;
       }
 
       const playerRoom = rooms.removePlayer(socket.id);
 
       if (playerRoom) {
-        io.to(playerRoom.code).emit("lobby:updated", lobbySnapshot(playerRoom));
+        io.to(SESSION_CHANNEL).emit("lobby:updated", lobbySnapshot(playerRoom));
       }
     });
   });

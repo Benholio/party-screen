@@ -1,54 +1,74 @@
-import { type FormEvent, useEffect, useState } from "react";
-import type { LobbySnapshot } from "../../shared/protocol";
+import { useEffect, useState } from "react";
+import type { CanvasStroke, LobbySnapshot } from "../../shared/protocol";
+import { CollaborativeCanvas } from "../CollaborativeCanvas";
 import { socket } from "../socket";
 
 export function PlayerApp() {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string>();
-  const [joining, setJoining] = useState(false);
-  const [joinedAs, setJoinedAs] = useState<{ code: string; name: string }>();
+  const [joinedAs, setJoinedAs] = useState<{ name: string }>();
   const [lobby, setLobby] = useState<LobbySnapshot>();
+  const [strokes, setStrokes] = useState<CanvasStroke[]>([]);
+  const [canvasError, setCanvasError] = useState<string>();
 
   useEffect(() => {
+    let retryTimer: number | undefined;
+
+    function joinActiveSession() {
+      if (!socket.connected) return;
+      socket.timeout(5_000).emit("room:join", (timeoutError, result) => {
+        if (timeoutError) {
+          setError("The server didn't respond. Retrying…");
+          retryTimer = window.setTimeout(joinActiveSession, 1_500);
+          return;
+        }
+
+        if (result.ok) {
+          setJoinedAs({ name: result.name });
+          setError(undefined);
+          return;
+        }
+
+        setError(result.message);
+        retryTimer = window.setTimeout(joinActiveSession, 1_500);
+      });
+    }
+
     function roomClosed() {
       setJoinedAs(undefined);
       setLobby(undefined);
+      setStrokes([]);
       setError("The shared display disconnected, so the room was closed.");
+      retryTimer = window.setTimeout(joinActiveSession, 1_500);
     }
 
     socket.on("lobby:updated", setLobby);
     socket.on("room:closed", roomClosed);
+    socket.on("canvas:snapshot", (canvas) => setStrokes(canvas.strokes));
+    socket.on("canvas:stroke", (stroke) => {
+      setStrokes((current) => current.some(({ id }) => id === stroke.id) ? current : [...current, stroke]);
+    });
+    socket.on("connect", joinActiveSession);
     socket.connect();
     return () => {
+      window.clearTimeout(retryTimer);
       socket.off("lobby:updated", setLobby);
       socket.off("room:closed", roomClosed);
+      socket.off("canvas:snapshot");
+      socket.off("canvas:stroke");
+      socket.off("connect", joinActiveSession);
       socket.disconnect();
     };
   }, []);
 
-  function joinRoom(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(undefined);
-
-    if (!socket.connected) {
-      setError("Still connecting. Please try again.");
-      return;
-    }
-
-    setJoining(true);
-    socket.timeout(5_000).emit("room:join", { code, name }, (timeoutError, result) => {
-      setJoining(false);
-
+  function addStroke(stroke: CanvasStroke) {
+    setCanvasError(undefined);
+    socket.timeout(5_000).emit("canvas:stroke", stroke, (timeoutError, result) => {
       if (timeoutError) {
-        setError("The server didn't respond. Please try again.");
-        return;
-      }
-
-      if (result.ok) {
-        setJoinedAs({ code: result.code, name: result.name });
+        setCanvasError("That stroke didn't reach the shared display. Please try again.");
+      } else if (!result.ok) {
+        setCanvasError(result.message);
       } else {
-        setError(result.message);
+        setStrokes((current) => [...current, stroke]);
       }
     });
   }
@@ -58,11 +78,14 @@ export function PlayerApp() {
       <p className="eyebrow">Player phone</p>
       {joinedAs ? (
         <section className="joined-card">
-          <h1>You're in!</h1>
+          <h1>Draw together</h1>
           <p className="lead">
-            Playing as <strong>{joinedAs.name}</strong> in room {joinedAs.code}
+            Drawing as <strong>{joinedAs.name}</strong>
           </p>
-          <p className="status">Look at the shared screen to continue.</p>
+          <div className="shared-canvas">
+            <CollaborativeCanvas onStroke={addStroke} strokes={strokes} />
+          </div>
+          {canvasError && <p className="form-error">{canvasError}</p>}
           {lobby && (
             <div className="phone-lobby" aria-live="polite">
               <h2>Players</h2>
@@ -76,39 +99,8 @@ export function PlayerApp() {
         </section>
       ) : (
         <>
-          <h1>Join the party</h1>
-          <form className="join-form" onSubmit={joinRoom}>
-            <label>
-              Room code
-              <input
-                autoCapitalize="characters"
-                autoComplete="off"
-                maxLength={4}
-                name="code"
-                onChange={(event) => setCode(event.target.value.toUpperCase())}
-                placeholder="ABCD"
-                required
-                spellCheck={false}
-                value={code}
-              />
-            </label>
-            <label>
-              Your name
-              <input
-                autoComplete="nickname"
-                maxLength={20}
-                name="name"
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Sam"
-                required
-                value={name}
-              />
-            </label>
-            {error && <p className="form-error">{error}</p>}
-            <button disabled={joining} type="submit">
-              {joining ? "Joining…" : "Join room"}
-            </button>
-          </form>
+          <h1>Joining…</h1>
+          <p className="status">{error ?? "Looking for the active session…"}</p>
         </>
       )}
     </main>

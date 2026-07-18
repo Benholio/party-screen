@@ -2,89 +2,92 @@ import { describe, expect, it } from "vitest";
 import { RoomStore } from "../src/server/room-store.js";
 
 describe("RoomStore", () => {
-  it("creates and retrieves a room", () => {
-    const rooms = new RoomStore(() => "ABCD");
+  it("creates and retrieves the active room", () => {
+    const rooms = new RoomStore();
 
     const room = rooms.create("host-1");
 
-    expect(room).toEqual({ code: "ABCD", hostSocketId: "host-1", players: new Map() });
-    expect(rooms.get("ABCD")).toBe(room);
+    expect(room).toEqual({
+      hostSocketId: "host-1",
+      players: new Map(),
+      strokes: [],
+    });
+    expect(rooms.getActive()).toBe(room);
   });
 
-  it("returns the existing room when the same host creates twice", () => {
-    const codes = ["ABCD", "EFGH"];
-    const rooms = new RoomStore(() => codes.shift() ?? "WXYZ");
-
-    expect(rooms.create("host-1")).toBe(rooms.create("host-1"));
-    expect(rooms.get("EFGH")).toBeUndefined();
-  });
-
-  it("retries when a generated code collides", () => {
-    const codes = ["ABCD", "ABCD", "EFGH"];
-    const rooms = new RoomStore(() => codes.shift() ?? "WXYZ");
-
-    rooms.create("host-1");
-    const secondRoom = rooms.create("host-2");
-
-    expect(secondRoom.code).toBe("EFGH");
+  it("returns the existing active room when another display connects", () => {
+    const rooms = new RoomStore();
+    expect(rooms.create("host-1")).toBe(rooms.create("host-2"));
   });
 
   it("deletes a room by its host", () => {
-    const rooms = new RoomStore(() => "ABCD");
+    const rooms = new RoomStore();
     rooms.create("host-1");
 
-    expect(rooms.deleteByHost("host-1")?.code).toBe("ABCD");
-    expect(rooms.get("ABCD")).toBeUndefined();
+    expect(rooms.deleteByHost("host-1")?.hostSocketId).toBe("host-1");
+    expect(rooms.getActive()).toBeUndefined();
   });
 
-  it("normalizes a room code and player name when joining", () => {
-    const rooms = new RoomStore(() => "ABCD");
+  it("automatically joins the active room with an assigned name", () => {
+    const rooms = new RoomStore();
     rooms.create("host-1");
 
-    const result = rooms.join(" abcd ", "player-1", "  Ada   Lovelace  ");
+    const result = rooms.joinActive("player-1");
 
     expect(result).toMatchObject({
       ok: true,
-      player: { id: "player-1", name: "Ada Lovelace" },
+      player: { id: "player-1", name: "Player 1" },
     });
-    expect(rooms.get("ABCD")?.players.get("player-1")?.name).toBe("Ada Lovelace");
+    expect(rooms.getActive()?.players.get("player-1")?.name).toBe("Player 1");
   });
 
-  it("rejects missing rooms and invalid names", () => {
-    const rooms = new RoomStore(() => "ABCD");
-    rooms.create("host-1");
-
-    expect(rooms.join("WXYZ", "player-1", "Ada")).toEqual({
+  it("waits when there is no active room", () => {
+    const rooms = new RoomStore();
+    expect(rooms.joinActive("player-1")).toEqual({
       ok: false,
-      reason: "invalid-code",
-    });
-    expect(rooms.join("ABCD", "player-1", "   ")).toEqual({
-      ok: false,
-      reason: "invalid-name",
-    });
-    expect(rooms.join("ABCD", "player-1", "A".repeat(21))).toEqual({
-      ok: false,
-      reason: "invalid-name",
+      reason: "no-active-room",
     });
   });
 
-  it("rejects duplicate names case-insensitively", () => {
-    const rooms = new RoomStore(() => "ABCD");
+  it("assigns unique sequential names and treats retries as idempotent", () => {
+    const rooms = new RoomStore();
     rooms.create("host-1");
-    rooms.join("ABCD", "player-1", "Ada");
+    const first = rooms.joinActive("player-1");
+    const second = rooms.joinActive("player-2");
 
-    expect(rooms.join("ABCD", "player-2", "ada")).toEqual({
-      ok: false,
-      reason: "duplicate-name",
-    });
+    expect(first).toMatchObject({ ok: true, player: { name: "Player 1" } });
+    expect(second).toMatchObject({ ok: true, player: { name: "Player 2" } });
+    const retried = rooms.joinActive("player-1");
+    expect(retried).toMatchObject({ ok: true, player: { name: "Player 1" } });
   });
 
   it("removes a player by socket id", () => {
-    const rooms = new RoomStore(() => "ABCD");
+    const rooms = new RoomStore();
     const room = rooms.create("host-1");
-    rooms.join("ABCD", "player-1", "Ada");
+    rooms.joinActive("player-1");
 
-    expect(rooms.removePlayer("player-1")?.code).toBe("ABCD");
+    expect(rooms.removePlayer("player-1")?.hostSocketId).toBe("host-1");
     expect(room.players.size).toBe(0);
+  });
+
+  it("accepts validated strokes from joined players", () => {
+    const rooms = new RoomStore();
+    const room = rooms.create("host-1");
+    rooms.joinActive("player-1");
+
+    const stroke = { id: "stroke-1", points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }] };
+    expect(rooms.addStroke("player-1", stroke)).toBe(room);
+    expect(room.strokes).toEqual([stroke]);
+    expect(rooms.addStroke("player-1", stroke)).toBeUndefined();
+  });
+
+  it("rejects strokes from non-players and out-of-bounds points", () => {
+    const rooms = new RoomStore();
+    rooms.create("host-1");
+    rooms.joinActive("player-1");
+
+    const invalidStroke = { id: "stroke-1", points: [{ x: 0, y: 0 }, { x: 2, y: 1 }] };
+    expect(rooms.addStroke("unknown", invalidStroke)).toBeUndefined();
+    expect(rooms.addStroke("player-1", invalidStroke)).toBeUndefined();
   });
 });

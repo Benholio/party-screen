@@ -1,18 +1,24 @@
 import { useEffect, useState } from "react";
-import type { CreateRoomResult, LobbySnapshot } from "../../shared/protocol";
+import type {
+  CanvasStroke,
+  CreateRoomResult,
+  LobbySnapshot,
+} from "../../shared/protocol";
+import { CollaborativeCanvas } from "../CollaborativeCanvas";
 import { socket } from "../socket";
 
 export function DisplayApp() {
-  const [code, setCode] = useState<string>();
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string>();
   const [lobby, setLobby] = useState<LobbySnapshot>();
+  const [strokes, setStrokes] = useState<CanvasStroke[]>([]);
 
   useEffect(() => {
     function createRoom() {
       setError(undefined);
       socket.emit("room:create", (result: CreateRoomResult) => {
         if (result.ok) {
-          setCode(result.code);
+          setReady(true);
         } else {
           setError(result.message);
         }
@@ -21,11 +27,17 @@ export function DisplayApp() {
 
     socket.on("connect", createRoom);
     socket.on("lobby:updated", setLobby);
+    socket.on("canvas:snapshot", (canvas) => setStrokes(canvas.strokes));
+    socket.on("canvas:stroke", (stroke) => {
+      setStrokes((current) => current.some(({ id }) => id === stroke.id) ? current : [...current, stroke]);
+    });
     socket.connect();
 
     return () => {
       socket.off("connect", createRoom);
       socket.off("lobby:updated", setLobby);
+      socket.off("canvas:snapshot");
+      socket.off("canvas:stroke");
       socket.disconnect();
     };
   }, []);
@@ -33,15 +45,15 @@ export function DisplayApp() {
   return (
     <main className="screen screen--display">
       <p className="eyebrow">Shared display</p>
-      <h1>Join the party</h1>
+      <h1>Creative mode</h1>
       {error ? (
         <p className="status status--error">{error}</p>
-      ) : code ? (
+      ) : ready ? (
         <>
-          <p className="lead">Enter this room code on your phone</p>
-          <p className="room-code" aria-label={`Room code ${code}`}>
-            {code}
-          </p>
+          <p className="lead">Open the play page to join and draw together</p>
+          <div className="shared-canvas shared-canvas--display">
+            <CollaborativeCanvas strokes={strokes} />
+          </div>
           <section className="lobby" aria-live="polite">
             <h2>
               {lobby?.players.length

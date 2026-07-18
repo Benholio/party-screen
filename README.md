@@ -2,7 +2,7 @@
 
 An early TypeScript prototype for a second-screen party game: a shared browser display, phone-based player interfaces, and a Node.js real-time server.
 
-The MVP lobby supports short-code room creation, phone joining, synchronized player lists, disconnect updates, and room closure when the shared display leaves.
+The MVP supports an automatically discoverable active session, synchronized player lists, and an always-open collaborative canvas. Opening the play page joins the current display session with a temporary player name; players can contribute strokes from their phones while everyone sees the same ephemeral artwork.
 
 ## Development
 
