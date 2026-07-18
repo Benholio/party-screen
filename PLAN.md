@@ -93,11 +93,11 @@ This milestone completes the initial proof of concept. Gameplay should begin as 
 - **In-memory state versus persistent storage:** In-memory state is sufficient for the proof of concept, but rooms will disappear when the server restarts and will not span multiple server instances. Persistence is intentionally deferred.
 - **Complete snapshots versus incremental updates:** Complete lobby snapshots are simpler and less prone to synchronization errors while rooms are small. Incremental events can wait until state size or update frequency makes them necessary.
 - **Connection identity versus persistent player identity:** Using a connection as a player's identity is the simplest initial behavior, but a reconnect may appear as leaving and rejoining. Stable session tokens remain an open decision for gameplay.
-- **Room-code format and limits:** Exact code length, character set, room capacity, name rules, and code-expiration policy have not been decided. They should be chosen during the room milestone and documented with tests.
+- **Room-code format and limits:** Room codes are four uppercase characters using an ambiguity-free alphabet and exist only while their display is connected. Room capacity and player-name rules remain open for the joining milestone.
 - **Client routing:** The display and phone interfaces may use simple path detection or a small routing library. This should be decided when establishing the application shell; a routing dependency is not required by the current scope.
 - **Host recovery:** The proposed initial behavior closes a room when the display disconnects. Recovering a host session is deferred until real-device testing shows whether it is necessary.
 - **Framework boundaries:** No generic game engine, plugin system, phase abstraction, deployment architecture, authentication system, or database is proposed yet. The first playable game should reveal which abstractions are actually useful.
 
 ## Current next step
 
-Review and approve the proposed stack and the open decisions needed for milestone 1. After approval, implement only the application shell: TypeScript tooling, the two placeholder browser screens, the Node.js server, and the quality-check commands. Room behavior should remain for the following milestone.
+Implement milestone 3: add the phone join form, server-side input validation, and authoritative player membership. Lobby broadcasts and disconnect synchronization remain in milestone 4.
