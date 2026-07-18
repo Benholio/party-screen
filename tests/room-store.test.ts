@@ -33,7 +33,7 @@ describe("RoomStore", () => {
     const rooms = new RoomStore(() => "ABCD");
     rooms.create("host-1");
 
-    expect(rooms.deleteByHost("host-1")).toBe(true);
+    expect(rooms.deleteByHost("host-1")?.code).toBe("ABCD");
     expect(rooms.get("ABCD")).toBeUndefined();
   });
 
@@ -84,7 +84,7 @@ describe("RoomStore", () => {
     const room = rooms.create("host-1");
     rooms.join("ABCD", "player-1", "Ada");
 
-    expect(rooms.removePlayer("player-1")).toBe(true);
+    expect(rooms.removePlayer("player-1")?.code).toBe("ABCD");
     expect(room.players.size).toBe(0);
   });
 });

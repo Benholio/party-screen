@@ -87,14 +87,24 @@ export class RoomStore {
     return { ok: true, room, player };
   }
 
-  deleteByHost(hostSocketId: string): boolean {
+  deleteByHost(hostSocketId: string): Room | undefined {
     const room = this.findByHost(hostSocketId);
-    return room ? this.rooms.delete(room.code) : false;
+
+    if (room) {
+      this.rooms.delete(room.code);
+    }
+
+    return room;
   }
 
-  removePlayer(socketId: string): boolean {
+  removePlayer(socketId: string): Room | undefined {
     const room = this.findPlayerRoom(socketId);
-    return room ? room.players.delete(socketId) : false;
+
+    if (room) {
+      room.players.delete(socketId);
+    }
+
+    return room;
   }
 
   private findByHost(hostSocketId: string): Room | undefined {

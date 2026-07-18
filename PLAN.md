@@ -86,6 +86,8 @@ This is one package rather than a monorepo. `shared/protocol.ts` should hold onl
 
 This milestone completes the initial proof of concept. Gameplay should begin as a separate follow-up slice.
 
+**Status:** Complete. The shared display was verified on a second computer and the player interface on a phone over the same local network. No essential usability blockers were found during this check.
+
 ## Important tradeoffs or open decisions
 
 - **Single project versus multiple apps:** A single package is proposed because it minimizes setup and makes shared TypeScript types straightforward. This can be revisited if the clients later need independent deployment or substantially different tooling.
@@ -94,10 +96,10 @@ This milestone completes the initial proof of concept. Gameplay should begin as 
 - **Complete snapshots versus incremental updates:** Complete lobby snapshots are simpler and less prone to synchronization errors while rooms are small. Incremental events can wait until state size or update frequency makes them necessary.
 - **Connection identity versus persistent player identity:** Using a connection as a player's identity is the simplest initial behavior, but a reconnect may appear as leaving and rejoining. Stable session tokens remain an open decision for gameplay.
 - **Room-code format and limits:** Room codes are four uppercase characters using an ambiguity-free alphabet and exist only while their display is connected. Player names are 1–20 characters after whitespace normalization and unique within a room case-insensitively. A room-capacity limit remains open.
-- **Client routing:** The display and phone interfaces may use simple path detection or a small routing library. This should be decided when establishing the application shell; a routing dependency is not required by the current scope.
+- **Client routing:** The MVP uses simple path detection for `/display` and `/play`, avoiding a routing dependency. This can be revisited if navigation becomes more complex.
 - **Host recovery:** The proposed initial behavior closes a room when the display disconnects. Recovering a host session is deferred until real-device testing shows whether it is necessary.
 - **Framework boundaries:** No generic game engine, plugin system, phase abstraction, deployment architecture, authentication system, or database is proposed yet. The first playable game should reveal which abstractions are actually useful.
 
 ## Current next step
 
-Implement milestone 4: broadcast complete lobby snapshots, render connected players on both interfaces, synchronize disconnects, and add end-to-end socket integration coverage.
+The initial lobby vertical slice is complete. Define the smallest first gameplay slice before further implementation—for example, a display-controlled start action followed by one simple phone interaction and a shared result. The exact game behavior should be chosen before adding phases or other framework abstractions.

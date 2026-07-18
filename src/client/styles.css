@@ -150,3 +150,41 @@ h1 {
   justify-items: center;
   gap: 1rem;
 }
+
+.lobby {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.lobby h2,
+.phone-lobby h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.player-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player-list li {
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: rgb(255 255 255 / 9%);
+  font-weight: 800;
+}
+
+.phone-lobby {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1rem;
+}

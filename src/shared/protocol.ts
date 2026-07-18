@@ -11,6 +11,16 @@ export type JoinRoomResult =
   | { ok: true; code: string; name: string }
   | { ok: false; message: string };
 
+export interface LobbyPlayer {
+  id: string;
+  name: string;
+}
+
+export interface LobbySnapshot {
+  code: string;
+  players: LobbyPlayer[];
+}
+
 export interface ClientToServerEvents {
   "room:create": (acknowledge: (result: CreateRoomResult) => void) => void;
   "room:join": (
@@ -19,5 +29,7 @@ export interface ClientToServerEvents {
   ) => void;
 }
 
-// Server-pushed lobby events are introduced when players can join rooms.
-export type ServerToClientEvents = Record<never, never>;
+export interface ServerToClientEvents {
+  "lobby:updated": (lobby: LobbySnapshot) => void;
+  "room:closed": () => void;
+}

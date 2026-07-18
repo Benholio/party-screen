@@ -1,8 +1,19 @@
 import type { Server } from "socket.io";
-import type { ClientToServerEvents, ServerToClientEvents } from "../shared/protocol.js";
-import type { RoomStore } from "./room-store.js";
+import type {
+  ClientToServerEvents,
+  LobbySnapshot,
+  ServerToClientEvents,
+} from "../shared/protocol.js";
+import type { Room, RoomStore } from "./room-store.js";
 
 type PartyServer = Server<ClientToServerEvents, ServerToClientEvents>;
+
+function lobbySnapshot(room: Room): LobbySnapshot {
+  return {
+    code: room.code,
+    players: Array.from(room.players.values()),
+  };
+}
 
 export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void {
   io.on("connection", (socket) => {
@@ -11,6 +22,7 @@ export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void 
         const room = rooms.create(socket.id);
         void socket.join(room.code);
         acknowledge({ ok: true, code: room.code });
+        io.to(room.code).emit("lobby:updated", lobbySnapshot(room));
       } catch {
         acknowledge({ ok: false, message: "Unable to create a room. Please try again." });
       }
@@ -32,11 +44,22 @@ export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void 
 
       void socket.join(result.room.code);
       acknowledge({ ok: true, code: result.room.code, name: result.player.name });
+      io.to(result.room.code).emit("lobby:updated", lobbySnapshot(result.room));
     });
 
     socket.on("disconnect", () => {
-      rooms.deleteByHost(socket.id);
-      rooms.removePlayer(socket.id);
+      const hostedRoom = rooms.deleteByHost(socket.id);
+
+      if (hostedRoom) {
+        io.to(hostedRoom.code).emit("room:closed");
+        return;
+      }
+
+      const playerRoom = rooms.removePlayer(socket.id);
+
+      if (playerRoom) {
+        io.to(playerRoom.code).emit("lobby:updated", lobbySnapshot(playerRoom));
+      }
     });
   });
 }
