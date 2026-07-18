@@ -1,4 +1,6 @@
-import type { CanvasStroke } from "../shared/protocol.js";
+import { DRAWING_COLORS, type CanvasStroke } from "../shared/protocol.js";
+
+const DRAWING_COLOR_VALUES = new Set<string>(DRAWING_COLORS.map(({ value }) => value));
 
 export interface Room {
   hostSocketId: string;
@@ -60,7 +62,8 @@ export class RoomStore {
       return undefined;
     }
 
-    const valid = stroke.id.length <= 100 && stroke.points.length >= 2 && stroke.points.length <= 500
+    const valid = DRAWING_COLOR_VALUES.has(stroke.color)
+      && stroke.id.length <= 100 && stroke.points.length >= 2 && stroke.points.length <= 500
       && stroke.points.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)
         && x >= 0 && x <= 1 && y >= 0 && y <= 1);
     if (!valid) return undefined;

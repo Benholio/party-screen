@@ -75,7 +75,11 @@ describe("RoomStore", () => {
     const room = rooms.create("host-1");
     rooms.joinActive("player-1");
 
-    const stroke = { id: "stroke-1", points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }] };
+    const stroke = {
+      color: "#ef476f",
+      id: "stroke-1",
+      points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+    };
     expect(rooms.addStroke("player-1", stroke)).toBe(room);
     expect(room.strokes).toEqual([stroke]);
     expect(rooms.addStroke("player-1", stroke)).toBeUndefined();
@@ -86,8 +90,17 @@ describe("RoomStore", () => {
     rooms.create("host-1");
     rooms.joinActive("player-1");
 
-    const invalidStroke = { id: "stroke-1", points: [{ x: 0, y: 0 }, { x: 2, y: 1 }] };
+    const invalidStroke = {
+      color: "#17132b",
+      id: "stroke-1",
+      points: [{ x: 0, y: 0 }, { x: 2, y: 1 }],
+    };
     expect(rooms.addStroke("unknown", invalidStroke)).toBeUndefined();
     expect(rooms.addStroke("player-1", invalidStroke)).toBeUndefined();
+    expect(rooms.addStroke("player-1", {
+      ...invalidStroke,
+      color: "hotpink",
+      points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    })).toBeUndefined();
   });
 });

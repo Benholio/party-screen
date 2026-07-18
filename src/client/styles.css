@@ -184,8 +184,102 @@ h1 {
   width: min(100%, 32rem);
 }
 
+.color-palette {
+  display: flex;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.25rem;
+}
+
+.color-swatch {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 25%);
+}
+
+.color-swatch[aria-pressed="true"] {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px #8f7dff;
+  transform: scale(1.08);
+}
+
+.color-swatch:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
 .shared-canvas--display {
-  width: min(65vh, 42rem, 80vw);
+  width: min(calc(100vh - 3rem), calc(100vw - 25rem));
+  max-width: 100%;
+  justify-self: center;
+}
+
+.display-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1.5rem, 3vw, 3.5rem);
+  width: 100%;
+  min-height: calc(100vh - 2rem);
+}
+
+.display-sidebar {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.display-sidebar h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 4vw, 3.75rem);
+}
+
+.display-sidebar .lead {
+  font-size: 1rem;
+}
+
+.join-panel {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  width: min(100%, 15rem);
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 8%);
+}
+
+.join-panel h2,
+.join-panel p {
+  margin: 0;
+}
+
+.join-panel img {
+  display: block;
+  width: 100%;
+  border-radius: 0.5rem;
+}
+
+.join-panel p {
+  overflow-wrap: anywhere;
+  color: #cbcde0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .display-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .shared-canvas--display {
+    width: min(90vw, 60vh);
+  }
 }
 
 .drawing-canvas {
@@ -198,12 +292,7 @@ h1 {
   touch-action: none;
 }
 
-.screen--display:has(.shared-canvas) {
-  align-content: start;
-  gap: 0.75rem;
-  padding-block: 1.25rem;
-}
-
-.screen--display:has(.shared-canvas) h1 {
-  font-size: clamp(2.5rem, 6vw, 5rem);
+.screen--display:has(.display-layout) {
+  display: block;
+  padding: 1rem clamp(1rem, 2vw, 2rem);
 }

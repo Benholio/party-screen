@@ -14,7 +14,7 @@ import type {
   ServerToClientEvents,
 } from "../src/shared/protocol.js";
 import { RoomStore } from "../src/server/room-store.js";
-import { registerSocketHandlers } from "../src/server/socket-handlers.js";
+import { buildJoinUrl, registerSocketHandlers } from "../src/server/socket-handlers.js";
 
 type PartyClient = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -122,6 +122,7 @@ describe("lobby socket flow", () => {
     expect(await initialCanvas).toEqual({ strokes: [] });
 
     const stroke = {
+      color: "#3787ff",
       id: "stroke-1",
       points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
     };
@@ -133,5 +134,16 @@ describe("lobby socket flow", () => {
     const currentCanvas = nextCanvasSnapshot(latePlayer);
     await joinRoom(latePlayer);
     expect(await currentCanvas).toEqual({ strokes: [stroke] });
+  });
+});
+
+describe("join URL", () => {
+  it("uses the LAN address with the display origin's port", () => {
+    expect(buildJoinUrl("192.168.68.51", 3000, "http://localhost:5173")).toBe(
+      "http://192.168.68.51:5173/play",
+    );
+    expect(buildJoinUrl("192.168.68.51", 3000)).toBe(
+      "http://192.168.68.51:3000/play",
+    );
   });
 });

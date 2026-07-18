@@ -18,7 +18,18 @@ export interface CanvasPoint {
   y: number;
 }
 
+export const DRAWING_COLORS = [
+  { name: "Ink", value: "#17132b" },
+  { name: "Red", value: "#ef476f" },
+  { name: "Orange", value: "#f78c35" },
+  { name: "Yellow", value: "#ffd166" },
+  { name: "Green", value: "#43aa8b" },
+  { name: "Blue", value: "#3787ff" },
+  { name: "Purple", value: "#8b5cf6" },
+] as const;
+
 export interface CanvasStroke {
+  color: string;
   id: string;
   points: CanvasPoint[];
 }
@@ -39,6 +50,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  "app:config": (config: { joinUrl: string }) => void;
   "lobby:updated": (lobby: LobbySnapshot) => void;
   "room:closed": () => void;
   "canvas:snapshot": (canvas: CanvasSnapshot) => void;

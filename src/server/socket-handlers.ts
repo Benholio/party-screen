@@ -10,6 +10,25 @@ import type { Room, RoomStore } from "./room-store.js";
 type PartyServer = Server<ClientToServerEvents, ServerToClientEvents>;
 const SESSION_CHANNEL = "active-session";
 
+interface SocketHandlerOptions {
+  fallbackPort: number;
+  lanAddress: string;
+}
+
+export function buildJoinUrl(
+  lanAddress: string,
+  fallbackPort: number,
+  origin?: string,
+): string {
+  try {
+    const displayUrl = new URL(origin ?? "");
+    const port = displayUrl.port ? `:${displayUrl.port}` : "";
+    return `${displayUrl.protocol}//${lanAddress}${port}/play`;
+  } catch {
+    return `http://${lanAddress}:${fallbackPort}/play`;
+  }
+}
+
 function lobbySnapshot(room: Room): LobbySnapshot {
   return {
     players: Array.from(room.players.values()),
@@ -20,8 +39,16 @@ function canvasSnapshot(room: Room): CanvasSnapshot {
   return { strokes: room.strokes };
 }
 
-export function registerSocketHandlers(io: PartyServer, rooms: RoomStore): void {
+export function registerSocketHandlers(
+  io: PartyServer,
+  rooms: RoomStore,
+  options: SocketHandlerOptions = { fallbackPort: 3000, lanAddress: "127.0.0.1" },
+): void {
   io.on("connection", (socket) => {
+    socket.emit("app:config", {
+      joinUrl: buildJoinUrl(options.lanAddress, options.fallbackPort, socket.handshake.headers.origin),
+    });
+
     socket.on("room:create", (acknowledge) => {
       try {
         const room = rooms.create(socket.id);

@@ -1,7 +1,8 @@
 import { type PointerEvent, useEffect, useRef } from "react";
-import type { CanvasPoint, CanvasStroke } from "../shared/protocol";
+import { DRAWING_COLORS, type CanvasPoint, type CanvasStroke } from "../shared/protocol";
 
 interface CollaborativeCanvasProps {
+  color?: string;
   onStroke?: (stroke: CanvasStroke) => void;
   strokes: CanvasStroke[];
 }
@@ -9,13 +10,18 @@ interface CollaborativeCanvasProps {
 function drawStroke(context: CanvasRenderingContext2D, stroke: CanvasStroke, width: number, height: number) {
   const [first, ...rest] = stroke.points;
   if (!first) return;
+  context.strokeStyle = stroke.color;
   context.beginPath();
   context.moveTo(first.x * width, first.y * height);
   rest.forEach((point) => context.lineTo(point.x * width, point.y * height));
   context.stroke();
 }
 
-export function CollaborativeCanvas({ onStroke, strokes }: CollaborativeCanvasProps) {
+export function CollaborativeCanvas({
+  color = DRAWING_COLORS[0].value,
+  onStroke,
+  strokes,
+}: CollaborativeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activePoints = useRef<CanvasPoint[]>([]);
 
@@ -25,7 +31,6 @@ export function CollaborativeCanvas({ onStroke, strokes }: CollaborativeCanvasPr
     if (!canvas || !context) return;
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.strokeStyle = "#17132b";
     context.lineCap = "round";
     context.lineJoin = "round";
     context.lineWidth = 8;
@@ -53,7 +58,12 @@ export function CollaborativeCanvas({ onStroke, strokes }: CollaborativeCanvasPr
     activePoints.current.push(next);
     const context = event.currentTarget.getContext("2d");
     if (context && previous) {
-      drawStroke(context, { id: "active", points: [previous, next] }, event.currentTarget.width, event.currentTarget.height);
+      drawStroke(
+        context,
+        { color, id: "active", points: [previous, next] },
+        event.currentTarget.width,
+        event.currentTarget.height,
+      );
     }
   }
 
@@ -65,7 +75,7 @@ export function CollaborativeCanvas({ onStroke, strokes }: CollaborativeCanvasPr
     const id = typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    onStroke({ id, points: activePoints.current.slice(0, 500) });
+    onStroke({ color, id, points: activePoints.current.slice(0, 500) });
     activePoints.current = [];
   }
 

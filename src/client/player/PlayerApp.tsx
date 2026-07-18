@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CanvasStroke, LobbySnapshot } from "../../shared/protocol";
+import { DRAWING_COLORS, type CanvasStroke, type LobbySnapshot } from "../../shared/protocol";
 import { CollaborativeCanvas } from "../CollaborativeCanvas";
 import { socket } from "../socket";
 
@@ -9,6 +9,7 @@ export function PlayerApp() {
   const [lobby, setLobby] = useState<LobbySnapshot>();
   const [strokes, setStrokes] = useState<CanvasStroke[]>([]);
   const [canvasError, setCanvasError] = useState<string>();
+  const [color, setColor] = useState<string>(DRAWING_COLORS[0].value);
 
   useEffect(() => {
     let retryTimer: number | undefined;
@@ -83,7 +84,20 @@ export function PlayerApp() {
             Drawing as <strong>{joinedAs.name}</strong>
           </p>
           <div className="shared-canvas">
-            <CollaborativeCanvas onStroke={addStroke} strokes={strokes} />
+            <CollaborativeCanvas color={color} onStroke={addStroke} strokes={strokes} />
+          </div>
+          <div className="color-palette" aria-label="Drawing colors" role="group">
+            {DRAWING_COLORS.map((option) => (
+              <button
+                aria-label={option.name}
+                aria-pressed={color === option.value}
+                className="color-swatch"
+                key={option.value}
+                onClick={() => setColor(option.value)}
+                style={{ backgroundColor: option.value }}
+                type="button"
+              />
+            ))}
           </div>
           {canvasError && <p className="form-error">{canvasError}</p>}
           {lobby && (
